@@ -835,7 +835,23 @@ function ReceiptView({ order, shop, logoSrc, onBack, onNewBill }: {
       const file = new File([pdfBlob], fileName, { type: "application/pdf" });
 
       let shared = false;
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      const phone = order.customerPhone;
+
+      // If a customer phone number is provided, bypass native share sheet to directly open the customer's chat
+      if (phone) {
+        const downloadUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+
+        const url = `https://wa.me/91${phone}?text=${encodeURIComponent(whatsappText + "\n\n(PDF bill downloaded, please attach it to send)")}`;
+        window.open(url, "_blank");
+        shared = true;
+      } else if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({
             files: [file],
@@ -858,10 +874,7 @@ function ReceiptView({ order, shop, logoSrc, onBack, onNewBill }: {
         document.body.removeChild(link);
         URL.revokeObjectURL(downloadUrl);
 
-        const phone = order.customerPhone;
-        const url = phone
-          ? `https://wa.me/91${phone}?text=${encodeURIComponent(whatsappText + "\n\n(PDF bill downloaded, please attach it to send)")}`
-          : `https://wa.me/?text=${encodeURIComponent(whatsappText + "\n\n(PDF bill downloaded, please attach it to send)")}`;
+        const url = `https://wa.me/?text=${encodeURIComponent(whatsappText + "\n\n(PDF bill downloaded, please attach it to send)")}`;
         window.open(url, "_blank");
       }
     } catch (error: any) {
