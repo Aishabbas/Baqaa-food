@@ -709,6 +709,53 @@ function ReceiptView({ order, shop, logoSrc, onBack, onNewBill }: {
   const whatsappText = `*${shop.name}*\nDate: ${format(new Date(order.createdAt), "dd/MM/yyyy, hh:mm a")}\nPayment: ${order.paymentMethod}\n\n${order.items.map((i: any) => `${i.name} x${i.quantity} = ${formatCurrency(i.amount)}`).join("\n")}\n\nSubtotal: ${formatCurrency(order.subtotal)}${order.discountAmount > 0 ? `\nDiscount: -${formatCurrency(order.discountAmount)}` : ""}\n*Total: ${formatCurrency(order.total)}*\n\nThank You! Visit Again!`;
 
   const shareReceiptPdf = async () => {
+    const phone = order.customerPhone;
+
+    // Option 2: Online Bill Web Link (No PDF Download)
+    if (phone) {
+      try {
+        const safeBtoa = (str: string) => {
+          return btoa(unescape(encodeURIComponent(str)));
+        };
+
+        const dataToEncode = {
+          order: {
+            billNumber: order.billNumber,
+            createdAt: order.createdAt,
+            customerPhone: order.customerPhone,
+            paymentMethod: order.paymentMethod,
+            items: order.items,
+            subtotal: order.subtotal,
+            discountType: order.discountType,
+            discountValue: order.discountValue,
+            discountAmount: order.discountAmount,
+            total: order.total
+          },
+          shop: {
+            name: shop.name,
+            address: shop.address,
+            contact: shop.contact,
+            gstin: shop.gstin
+          },
+          logoSrc: logoSrc || ""
+        };
+
+        const encoded = safeBtoa(JSON.stringify(dataToEncode));
+        // We construct the bill link using Hash Router receipt route
+        const billLink = `${window.location.origin}${window.location.pathname}#/receipt?data=${encoded}`;
+        
+        const url = `https://wa.me/91${phone}?text=${encodeURIComponent(whatsappText + "\n\nView Bill: " + billLink)}`;
+        window.open(url, "_blank");
+        return;
+      } catch (err) {
+        console.error("Failed to generate digital bill link:", err);
+      }
+    }
+
+    // Fallback: If no phone is provided, generate and download PDF/share via native panel
+    const element = document.getElementById("print-receipt");
+    if (!element) return;
+
     try {
       // Build an isolated receipt div with explicit hex colors — no Tailwind/oklch anywhere
       const wrapper = document.createElement("div");
@@ -835,23 +882,7 @@ function ReceiptView({ order, shop, logoSrc, onBack, onNewBill }: {
       const file = new File([pdfBlob], fileName, { type: "application/pdf" });
 
       let shared = false;
-      const phone = order.customerPhone;
-
-      // If a customer phone number is provided, bypass native share sheet to directly open the customer's chat
-      if (phone) {
-        const downloadUrl = URL.createObjectURL(pdfBlob);
-        const link = document.createElement("a");
-        link.href = downloadUrl;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(downloadUrl);
-
-        const url = `https://wa.me/91${phone}?text=${encodeURIComponent(whatsappText + "\n\n(PDF bill downloaded, please attach it to send)")}`;
-        window.open(url, "_blank");
-        shared = true;
-      } else if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({
             files: [file],
@@ -880,10 +911,7 @@ function ReceiptView({ order, shop, logoSrc, onBack, onNewBill }: {
     } catch (error: any) {
       console.error("Error generating/sharing PDF:", error);
       alert(`Failed to generate PDF: ${error.message || error}. Opening WhatsApp instead.`);
-      const phone = order.customerPhone;
-      const url = phone
-        ? `https://wa.me/91${phone}?text=${encodeURIComponent(whatsappText)}`
-        : `https://wa.me/?text=${encodeURIComponent(whatsappText)}`;
+      const url = `https://wa.me/?text=${encodeURIComponent(whatsappText)}`;
       window.open(url, "_blank");
     }
   };

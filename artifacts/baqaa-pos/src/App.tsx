@@ -12,6 +12,7 @@ import Admin from "@/pages/admin";
 import Analytics from "@/pages/analytics";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
+import PublicReceipt from "@/pages/public-receipt";
 
 const queryClient = new QueryClient();
 
@@ -102,6 +103,19 @@ function App() {
     setAuth(null);
     sessionStorage.removeItem('baqaa_session');
   };
+
+  // ── Public Receipt Route ───────────────────────────────────────────────────
+  const isPublicReceipt = window.location.hash.startsWith("#/receipt");
+
+  if (isPublicReceipt) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <PublicReceipt />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
 
   // ── Secure Activation Screen ────────────────────────────────────────────────
   if (isAuthorized === false) {
