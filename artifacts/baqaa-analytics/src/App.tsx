@@ -139,7 +139,7 @@ function NavButton({ active, onClick, icon, label }: { active: boolean, onClick:
         "p-2.5 rounded-2xl transition-all duration-300",
         active ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/40 -translate-y-1" : "text-slate-500 hover:text-slate-300"
       )}>
-        {React.cloneElement(icon as React.ReactElement, { className: "w-5 h-5" })}
+        {React.cloneElement(icon as React.ReactElement<any>, { className: "w-5 h-5" })}
       </div>
       <span className={cn(
         "text-[9px] font-black uppercase tracking-widest transition-all",

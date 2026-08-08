@@ -55,7 +55,6 @@ function App() {
 
   useEffect(() => {
     initializeStorage();
-    StorageAPI.fetchCloudData().catch(console.error);
     
     // ── Secure Device Check ──────────────────────────────────────────────────
     const verifyDevice = () => {

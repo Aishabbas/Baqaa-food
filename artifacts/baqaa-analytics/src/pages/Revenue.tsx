@@ -8,7 +8,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Percent,
-  Calendar
+  Calendar,
+  ShoppingBag
 } from "lucide-react";
 import { 
   AreaChart, 
@@ -69,7 +70,11 @@ export default function Revenue({ orders, loading }: { orders: Order[], loading:
       const method = o.payment_method || 'Unknown';
       payments[method] = (payments[method] || 0) + o.total;
     });
-    const pieData = Object.entries(payments).map(([name, value]) => ({ name, value }));
+    const pieData = Object.entries(payments).map(([name, value]) => ({ 
+      name, 
+      value,
+      color: name === 'Swiggy' ? '#fc8019' : name === 'Zomato' ? '#cb202d' : name === 'Cash' ? '#10b981' : '#6366f1'
+    }));
 
     return {
       totalRevenue,
@@ -208,7 +213,7 @@ export default function Revenue({ orders, loading }: { orders: Order[], loading:
                   dataKey="value"
                 >
                   {stats.pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                    <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
                   ))}
                 </Pie>
                 <Tooltip 
@@ -268,9 +273,15 @@ export default function Revenue({ orders, loading }: { orders: Order[], loading:
               <div className="flex items-center gap-4">
                 <div className={cn(
                   "w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-inner",
-                  order.payment_method === 'Cash' ? "bg-emerald-500/10 text-emerald-400" : "bg-indigo-500/10 text-indigo-400"
+                  order.payment_method === 'Cash' ? "bg-emerald-500/10 text-emerald-400" : 
+                  order.payment_method === 'Swiggy' ? "bg-[#fc8019]/10 text-[#fc8019]" :
+                  order.payment_method === 'Zomato' ? "bg-[#cb202d]/10 text-[#cb202d]" :
+                  "bg-indigo-500/10 text-indigo-400"
                 )}>
-                  {order.payment_method === 'Cash' ? <Banknote className="w-5 h-5" /> : <CreditCard className="w-5 h-5" />}
+                  {order.payment_method === 'Cash' ? <Banknote className="w-5 h-5" /> : 
+                   order.payment_method === 'Swiggy' ? <ShoppingBag className="w-5 h-5" /> :
+                   order.payment_method === 'Zomato' ? <ShoppingBag className="w-5 h-5" /> :
+                   <CreditCard className="w-5 h-5" />}
                 </div>
                 <div>
                   <p className="text-sm font-black text-white">#{order.bill_number}</p>

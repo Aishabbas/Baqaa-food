@@ -92,9 +92,10 @@ export default function Orders({ orders, loading }: { orders: Order[], loading: 
               <div className="flex items-center gap-4">
                 <div className={cn(
                   "w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black shadow-inner border transition-all",
-                  order.payment_method === 'Cash' 
-                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
-                    : "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+                  order.payment_method === 'Cash' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                  order.payment_method === 'Swiggy' ? "bg-[#fc8019]/10 text-[#fc8019] border-[#fc8019]/20" :
+                  order.payment_method === 'Zomato' ? "bg-[#cb202d]/10 text-[#cb202d] border-[#cb202d]/20" :
+                  "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
                   selectedOrder === order.id && "scale-110 shadow-lg"
                 )}>
                   <span className="text-[8px] uppercase tracking-widest opacity-60 mb-0.5">Inv</span>
@@ -105,7 +106,9 @@ export default function Orders({ orders, loading }: { orders: Order[], loading: 
                     <p className="text-sm font-black text-white">{order.customer_name || 'Anonymous Guest'}</p>
                     <div className={cn(
                       "w-1.5 h-1.5 rounded-full",
-                      order.payment_method === 'Cash' ? "bg-emerald-400" : "bg-indigo-400"
+                      order.payment_method === 'Cash' ? "bg-emerald-400" :
+                      order.payment_method === 'Swiggy' ? "bg-[#fc8019]" :
+                      order.payment_method === 'Zomato' ? "bg-[#cb202d]" : "bg-indigo-400"
                     )} />
                   </div>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
@@ -118,7 +121,9 @@ export default function Orders({ orders, loading }: { orders: Order[], loading: 
                   <p className="text-base font-black text-white tracking-tight">{formatCurrency(order.total)}</p>
                   <p className={cn(
                     "text-[9px] font-black uppercase tracking-[0.15em] opacity-80",
-                    order.payment_method === 'Cash' ? "text-emerald-400" : "text-indigo-400"
+                    order.payment_method === 'Cash' ? "text-emerald-400" :
+                    order.payment_method === 'Swiggy' ? "text-[#fc8019]" :
+                    order.payment_method === 'Zomato' ? "text-[#cb202d]" : "text-indigo-400"
                   )}>{order.payment_method}</p>
                 </div>
                 <div className={cn(

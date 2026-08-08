@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from './supabase';
+// Supabase has been removed for local-only development.
 
 const DATA_VERSION = "1.0.0";
 const KEYS = {
@@ -65,7 +65,7 @@ export interface Order {
   discountValue: number;
   discountAmount: number;
   total: number;
-  paymentMethod: 'Cash' | 'Online';
+  paymentMethod: 'Cash' | 'Online' | 'Swiggy' | 'Zomato';
   customerName: string;
   customerPhone: string;
   createdAt: string;
@@ -137,6 +137,8 @@ export function initializeStorage() {
     localStorage.setItem(KEYS.MENU_ITEMS, JSON.stringify(menuItems));
     emitChange();
   }
+  
+  StorageAPI.listenForWebhooks();
 }
 
 function get<T>(key: string, defaultValue: T): T {
@@ -156,43 +158,16 @@ export const StorageAPI = {
   getSecuritySettings: () => get<SecuritySettings>(KEYS.SECURITY, DEFAULT_SECURITY),
   setSecuritySettings: (settings: SecuritySettings) => {
     set(KEYS.SECURITY, settings);
-    // Cloud Sync
-    supabase.from('settings').upsert({
-      id: 'main',
-      admin_pin: settings.adminPin,
-      staff_pin: settings.staffPin,
-      manager_pin: settings.managerPin,
-      updated_at: new Date().toISOString()
-    }).then();
   },
 
   getCategories: () => get<Category[]>(KEYS.CATEGORIES, []),
   setCategories: (cats: Category[]) => {
     set(KEYS.CATEGORIES, cats);
-    // Cloud Sync
-    cats.forEach(c => {
-      supabase.from('categories').upsert({
-        id: c.id,
-        name: c.name,
-        created_at: c.createdAt
-      }).then();
-    });
   },
   
   getMenuItems: () => get<MenuItem[]>(KEYS.MENU_ITEMS, []),
   setMenuItems: (items: MenuItem[]) => {
     set(KEYS.MENU_ITEMS, items);
-    // Cloud Sync
-    items.forEach(i => {
-      supabase.from('menu_items').upsert({
-        id: i.id,
-        name: i.name,
-        price: i.price,
-        category_id: i.categoryId,
-        image: i.image,
-        created_at: i.createdAt
-      }).then();
-    });
   },
 
   getOrders: () => get<Order[]>(KEYS.ORDERS, []),
@@ -210,22 +185,6 @@ export const StorageAPI = {
     orders.unshift(newOrder); // Add to top
     set(KEYS.ORDERS, orders);
     localStorage.setItem(KEYS.BILL_COUNTER, (currentBill + 1).toString());
-
-    // Cloud Sync
-    supabase.from('orders').upsert({
-      id: newOrder.id,
-      bill_number: newOrder.billNumber,
-      items: newOrder.items,
-      subtotal: newOrder.subtotal,
-      discount_type: newOrder.discountType,
-      discount_value: newOrder.discountValue,
-      discount_amount: newOrder.discountAmount,
-      total: newOrder.total,
-      payment_method: newOrder.paymentMethod,
-      customer_name: newOrder.customerName,
-      customer_phone: newOrder.customerPhone,
-      created_at: newOrder.createdAt
-    }).then();
 
     // Update customer
     if (newOrder.customerName) {
@@ -250,15 +209,6 @@ export const StorageAPI = {
         customers.push(customer);
         set(KEYS.CUSTOMERS, customers);
       }
-      
-      // Cloud Sync Customer
-      supabase.from('customers').upsert({
-        id: customer.id,
-        name: customer.name,
-        phone: customer.phone,
-        created_at: customer.createdAt,
-        last_order_date: customer.lastOrderDate
-      }).then();
     }
 
     return newOrder;
@@ -278,22 +228,6 @@ export const StorageAPI = {
     orders[index] = updatedOrder;
     set(KEYS.ORDERS, orders);
 
-    // Cloud Sync
-    supabase.from('orders').upsert({
-      id: updatedOrder.id,
-      bill_number: updatedOrder.billNumber,
-      items: updatedOrder.items,
-      subtotal: updatedOrder.subtotal,
-      discount_type: updatedOrder.discountType,
-      discount_value: updatedOrder.discountValue,
-      discount_amount: updatedOrder.discountAmount,
-      total: updatedOrder.total,
-      payment_method: updatedOrder.paymentMethod,
-      customer_name: updatedOrder.customerName,
-      customer_phone: updatedOrder.customerPhone,
-      created_at: updatedOrder.createdAt
-    }).then();
-
     return updatedOrder;
   },
 
@@ -301,128 +235,15 @@ export const StorageAPI = {
     const orders = StorageAPI.getOrders();
     const filtered = orders.filter(o => o.id !== id);
     set(KEYS.ORDERS, filtered);
-    
-    // Cloud Sync
-    try {
-      await supabase.from('orders').delete().eq('id', id);
-    } catch (e) {
-      console.error("Failed to delete order from cloud", e);
-    }
   },
 
   getCustomers: () => get<Customer[]>(KEYS.CUSTOMERS, []),
 
-  // Fetch all data from cloud (for new devices)
-  fetchCloudData: async () => {
-    try {
-      const { data: cats } = await supabase.from('categories').select('*');
-      const { data: items } = await supabase.from('menu_items').select('*');
-      const { data: orders } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-      const { data: customers } = await supabase.from('customers').select('*');
-      const { data: settings } = await supabase.from('settings').select('*').eq('id', 'main').single();
+  // Fetch all data from cloud - disabled for local-only
+  fetchCloudData: async () => {},
 
-      const localCats = get<Category[]>(KEYS.CATEGORIES, []);
-
-      // CASE 1: Cloud is empty, but Local has data -> Migrate Local to Cloud
-      if ((!cats || cats.length === 0) && localCats.length > 0) {
-        console.log("Cloud empty, migrating local data...");
-        StorageAPI.setCategories(localCats);
-        StorageAPI.setMenuItems(get<MenuItem[]>(KEYS.MENU_ITEMS, []));
-        return;
-      }
-
-      // CASE 2: Both Cloud and Local are empty -> Re-seed everything
-      if ((!cats || cats.length === 0) && localCats.length === 0) {
-        console.log("Everything empty, re-seeding default menu...");
-        // This will put SEED_DATA into LocalStorage
-        localStorage.removeItem(KEYS.VERSION); // Force re-seed
-        initializeStorage(); 
-        const freshLocalCats = get<Category[]>(KEYS.CATEGORIES, []);
-        StorageAPI.setCategories(freshLocalCats);
-        StorageAPI.setMenuItems(get<MenuItem[]>(KEYS.MENU_ITEMS, []));
-        return;
-      }
-
-      if (settings) localStorage.setItem(KEYS.SECURITY, JSON.stringify({
-        adminPin: settings.admin_pin,
-        staffPin: settings.staff_pin,
-        managerPin: settings.manager_pin
-      }));
-
-      if (cats && cats.length > 0) localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(cats.map(c => ({
-        id: c.id,
-        name: c.name,
-        createdAt: c.created_at
-      }))));
-
-      if (items && items.length > 0) localStorage.setItem(KEYS.MENU_ITEMS, JSON.stringify(items.map(i => ({
-        id: i.id,
-        name: i.name,
-        price: i.price,
-        categoryId: i.category_id,
-        image: i.image,
-        createdAt: i.created_at
-      }))));
-
-      if (orders && orders.length > 0) localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders.map(o => ({
-        ...o,
-        billNumber: o.bill_number,
-        discountType: o.discount_type,
-        discountValue: o.discount_value,
-        discountAmount: o.discount_amount,
-        paymentMethod: o.payment_method,
-        customerName: o.customer_name,
-        customerPhone: o.customer_phone,
-        createdAt: o.created_at,
-        synced: true
-      }))));
-
-      if (customers && customers.length > 0) localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(customers.map(c => ({
-        id: c.id,
-        name: c.name,
-        phone: c.phone,
-        createdAt: c.created_at,
-        lastOrderDate: c.last_order_date
-      }))));
-
-      emitChange();
-    } catch (e) {
-      console.error("Cloud fetch failed, using local data", e);
-    }
-  },
-
-  // Sync any orders that were created while offline
-  syncOfflineOrders: async () => {
-    const orders = StorageAPI.getOrders();
-    const unsynced = orders.filter((o: any) => !o.synced);
-    
-    if (unsynced.length === 0) return;
-
-    console.log(`Syncing ${unsynced.length} offline orders...`);
-
-    for (const order of unsynced) {
-      const { error } = await supabase.from('orders').upsert({
-        id: order.id,
-        bill_number: order.billNumber,
-        items: order.items,
-        subtotal: order.subtotal,
-        discount_type: order.discountType,
-        discount_value: order.discountValue,
-        discount_amount: order.discountAmount,
-        total: order.total,
-        payment_method: order.paymentMethod,
-        customer_name: order.customerName,
-        customer_phone: order.customerPhone,
-        created_at: order.createdAt
-      });
-
-      if (!error) {
-        order.synced = true;
-      }
-    }
-
-    set(KEYS.ORDERS, orders);
-  },
+  // Sync offline orders - disabled for local-only
+  syncOfflineOrders: async () => {},
   
   resetData: () => {
     localStorage.setItem(KEYS.ORDERS, "[]");
@@ -432,27 +253,50 @@ export const StorageAPI = {
   },
 
   resetCloudData: async () => {
-    try {
-      // 1. Clear Local Data
-      StorageAPI.resetData();
+    StorageAPI.resetData();
+  },
 
-      // 2. Clear Cloud Data (Deleting all rows)
-      await supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('customers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  listenForWebhooks: () => {
+    try {
+      const eventSource = new EventSource('http://localhost:3000/api/webhooks/stream');
       
-      // Note: We don't delete categories/items to keep the menu, 
-      // but if user wants full reset, we can.
-      // For now, let's just reset orders and analytics as requested.
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'new_order' && data.order) {
+            console.log('Received new webhook order:', data.order);
+            const newOrder = data.order;
+            const orders = StorageAPI.getOrders();
+            const currentBillStr = localStorage.getItem(KEYS.BILL_COUNTER) || "1001";
+            const currentBill = parseInt(currentBillStr, 10);
+            
+            const savedOrder = {
+              ...newOrder,
+              billNumber: currentBill
+            };
+            
+            orders.unshift(savedOrder);
+            set(KEYS.ORDERS, orders);
+            localStorage.setItem(KEYS.BILL_COUNTER, (currentBill + 1).toString());
+            
+            // Dispatch a specific event to play sound or notify UI if needed
+            window.dispatchEvent(new CustomEvent('baqaa_new_web_order', { detail: savedOrder }));
+            emitChange();
+          }
+        } catch(e) {
+          console.error("Failed to parse SSE", e);
+        }
+      };
+
+      eventSource.onerror = (error) => {
+        console.error("SSE Error:", error);
+        eventSource.close();
+      };
       
-      emitChange();
+      return () => eventSource.close();
     } catch (e) {
-      console.error("Cloud reset failed", e);
-      throw e;
+      console.error("SSE Setup failed", e);
+      return () => {};
     }
   }
 };
-
-// Auto-sync when coming back online
-window.addEventListener('online', () => StorageAPI.syncOfflineOrders());
-// Also try syncing every 1 minute just in case
-setInterval(() => StorageAPI.syncOfflineOrders(), 60000);

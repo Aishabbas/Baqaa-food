@@ -111,12 +111,16 @@ export default function Analytics() {
       repeatRate,
       cashRevenue: orders.filter(o => o.paymentMethod === 'Cash').reduce((sum, o) => sum + o.total, 0),
       onlineRevenue: orders.filter(o => o.paymentMethod === 'Online').reduce((sum, o) => sum + o.total, 0),
+      swiggyRevenue: orders.filter(o => o.paymentMethod === 'Swiggy').reduce((sum, o) => sum + o.total, 0),
+      zomatoRevenue: orders.filter(o => o.paymentMethod === 'Zomato').reduce((sum, o) => sum + o.total, 0),
     };
   }, [orders, previousOrders, allOrders]);
 
   const pieData = [
     { name: 'Cash', value: stats.cashRevenue, color: '#f97316' },
     { name: 'Online', value: stats.onlineRevenue, color: '#ec4899' },
+    { name: 'Swiggy', value: stats.swiggyRevenue, color: '#fc8019' },
+    { name: 'Zomato', value: stats.zomatoRevenue, color: '#cb202d' },
   ].filter(d => d.value > 0);
 
   const exportCSV = () => {
@@ -347,7 +351,12 @@ export default function Analytics() {
                       </td>
                       <td className="py-3 px-4 text-right font-black">{formatCurrency(o.total)}</td>
                       <td className="py-3 px-4 text-center">
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${o.paymentMethod==='Cash'?'bg-orange-100 text-orange-700':'bg-pink-100 text-pink-700'}`}>
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
+                          o.paymentMethod==='Cash'?'bg-orange-100 text-orange-700':
+                          o.paymentMethod==='Online'?'bg-pink-100 text-pink-700':
+                          o.paymentMethod==='Swiggy'?'bg-[#fc8019]/20 text-[#fc8019]':
+                          'bg-[#cb202d]/20 text-[#cb202d]'
+                        }`}>
                           {o.paymentMethod}
                         </span>
                       </td>

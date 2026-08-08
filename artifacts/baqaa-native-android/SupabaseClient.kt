@@ -7,8 +7,8 @@ import io.github.jan.supabase.serializer.KotlinXSerializer
 import kotlinx.serialization.json.Json
 
 object SupabaseConfig {
-    const val URL = "https://sxojvogkvampikyrkmlm.supabase.co"
-    const val ANON_KEY = "sb_publishable_8qjGJnCfQoTicEiZx3HwWw_xFNaMabA"
+    const val URL = "http://localhost:8080"
+    const val ANON_KEY = "local_mock_key"
 }
 
 val supabaseClient = createSupabaseClient(

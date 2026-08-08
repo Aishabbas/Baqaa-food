@@ -3,12 +3,15 @@ import { ShoppingCart, Plus, Minus, Trash2, ChevronDown, User, Phone, X, ArrowLe
 import { useCategories, useMenuItems, useOrders, useCustomers, useShopInfo } from "@/hooks/use-data";
 import { formatCurrency, getEmojiSvgUri, cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
+
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type CartItem = { id: string; name: string; price: number; qty: number; uid: string };
 type DiscountType = "none" | "percentage" | "rupees";
-type PaymentMethod = "Cash" | "Online";
+type PaymentMethod = "Cash" | "Online" | "Swiggy" | "Zomato";
 
 interface BillTab {
   id: string;
@@ -186,12 +189,54 @@ export default function POS() {
   }, [customers, activeTab.customerName]);
 
   // ── Actions ─────────────────────────────────────────────────────────────────
+  const getFullItemName = (itemName: string, categoryId: string) => {
+    const cat = categories.find((c: any) => c.id === categoryId);
+    if (!cat) return itemName;
+    const catName = cat.name.toLowerCase();
+    const lowerName = itemName.toLowerCase();
+
+    if (catName.includes("sandwich")) {
+      if (!lowerName.includes("sandwich") && !lowerName.includes("sandwitch")) {
+        return `${itemName} Sandwich`;
+      }
+    }
+    if (catName.includes("pizza")) {
+      if (!lowerName.includes("pizza")) {
+        return `${itemName} Pizza`;
+      }
+    }
+    if (catName.includes("burger")) {
+      if (!lowerName.includes("burger")) {
+        return `${itemName} Burger`;
+      }
+    }
+    if (catName.includes("wrap")) {
+      if (!lowerName.includes("wrap")) {
+        return `${itemName} Wrap`;
+      }
+    }
+    if (catName.includes("fries")) {
+      if (!lowerName.includes("fries")) {
+        return `${itemName} Fries`;
+      }
+    }
+    if (catName.includes("sizzler")) {
+      if (!lowerName.includes("sizzler")) {
+        return `${itemName} Sizzler`;
+      }
+    }
+    return itemName;
+  };
 
   const handleCheckout = () => {
     if (activeTab.cart.length === 0) return;
     
     const orderData = {
-      items: activeTab.cart.map((i) => ({ id: i.id, name: i.name, price: i.price, quantity: i.qty, amount: i.price * i.qty })),
+      items: activeTab.cart.map((i) => {
+        const menuItem = menuItems.find((m: any) => m.id === i.id);
+        const fullName = menuItem ? getFullItemName(i.name, menuItem.categoryId) : i.name;
+        return { id: i.id, name: fullName, price: i.price, quantity: i.qty, amount: i.price * i.qty };
+      }),
       subtotal,
       discountType: activeTab.discountType,
       discountValue: activeTab.discountValue,
@@ -543,6 +588,8 @@ export default function POS() {
                   >
                     <option value="Cash">Cash</option>
                     <option value="Online">Online</option>
+                    <option value="Swiggy">Swiggy</option>
+                    <option value="Zomato">Zomato</option>
                   </select>
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
@@ -661,6 +708,173 @@ function ReceiptView({ order, shop, logoSrc, onBack, onNewBill }: {
 }) {
   const whatsappText = `*${shop.name}*\nDate: ${format(new Date(order.createdAt), "dd/MM/yyyy, hh:mm a")}\nPayment: ${order.paymentMethod}\n\n${order.items.map((i: any) => `${i.name} x${i.quantity} = ${formatCurrency(i.amount)}`).join("\n")}\n\nSubtotal: ${formatCurrency(order.subtotal)}${order.discountAmount > 0 ? `\nDiscount: -${formatCurrency(order.discountAmount)}` : ""}\n*Total: ${formatCurrency(order.total)}*\n\nThank You! Visit Again!`;
 
+  const shareReceiptPdf = async () => {
+    try {
+      // Build an isolated receipt div with explicit hex colors — no Tailwind/oklch anywhere
+      const wrapper = document.createElement("div");
+      wrapper.style.cssText = [
+        "position:fixed", "top:-9999px", "left:-9999px",
+        "width:420px", "background:#ffffff", "padding:32px 24px",
+        "font-family:ui-sans-serif,system-ui,sans-serif",
+        "font-size:14px", "color:#111827", "line-height:1.5",
+        "box-sizing:border-box",
+      ].join(";");
+
+      const itemRows = order.items.map((item: any) => `
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;color:#1f2937;font-weight:500;">${item.name}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;text-align:center;width:40px;">${item.quantity}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;text-align:right;width:70px;">&#8377;${item.price.toFixed(2)}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;color:#1f2937;font-weight:600;text-align:right;width:70px;">&#8377;${item.amount.toFixed(2)}</td>
+        </tr>`).join("");
+
+      const discountRow = order.discountAmount > 0
+        ? `<div style="display:flex;justify-content:space-between;color:#ef4444;font-size:13px;padding:2px 0;">
+            <span>Discount${order.discountType === "percentage" ? ` (${order.discountValue}%)` : ""}:</span>
+            <span>-&#8377;${order.discountAmount.toFixed(2)}</span>
+           </div>`
+        : "";
+
+      const logoHtml = logoSrc
+        ? `<img src="${logoSrc}" style="height:56px;width:auto;display:block;margin:0 auto 12px;" crossorigin="anonymous" onerror="this.style.display='none'" />`
+        : "";
+
+      wrapper.innerHTML = `
+        <div style="text-align:center;margin-bottom:20px;">
+          ${logoHtml}
+          <div style="font-size:22px;font-weight:900;color:#111827;letter-spacing:-0.5px;">${shop.name}</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:6px;max-width:280px;margin-left:auto;margin-right:auto;">${shop.address}</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:4px;">Contact: ${shop.contact}</div>
+          ${shop.gstin ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px;letter-spacing:0.5px;">GSTIN: ${shop.gstin}</div>` : ""}
+        </div>
+
+        <hr style="border:none;border-top:1px solid #d1d5db;margin:0 0 14px;" />
+
+        <div style="font-size:13px;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;padding:2px 0;">
+            <span style="color:#6b7280;font-weight:500;">Date &amp; Time:</span>
+            <span style="color:#111827;font-weight:600;">${format(new Date(order.createdAt), "dd/MM/yyyy, hh:mm a")}</span>
+          </div>
+          ${order.customerPhone ? `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:#6b7280;font-weight:500;">Phone:</span><span style="color:#111827;font-weight:600;">${order.customerPhone}</span></div>` : ""}
+          <div style="display:flex;justify-content:space-between;padding:2px 0;">
+            <span style="color:#6b7280;font-weight:500;">Payment:</span>
+            <span style="color:#111827;font-weight:600;">${order.paymentMethod}</span>
+          </div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid #d1d5db;margin:0 0 14px;" />
+
+        <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
+          <thead>
+            <tr style="border-bottom:2px solid #e5e7eb;">
+              <th style="text-align:left;padding-bottom:8px;font-weight:700;color:#1f2937;font-size:13px;">Item</th>
+              <th style="text-align:center;padding-bottom:8px;font-weight:700;color:#1f2937;font-size:13px;width:40px;">Qty</th>
+              <th style="text-align:right;padding-bottom:8px;font-weight:700;color:#1f2937;font-size:13px;width:70px;">Price</th>
+              <th style="text-align:right;padding-bottom:8px;font-weight:700;color:#1f2937;font-size:13px;width:70px;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+
+        <hr style="border:none;border-top:1px solid #d1d5db;margin:0 0 12px;" />
+
+        <div style="font-size:13px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;padding:2px 0;color:#6b7280;">
+            <span>Subtotal:</span>
+            <span>&#8377;${order.subtotal.toFixed(2)}</span>
+          </div>
+          ${discountRow}
+        </div>
+
+        <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;color:#111827;padding:8px 0;border-top:2px solid #e5e7eb;margin-bottom:20px;">
+          <span>Total:</span>
+          <span>&#8377;${order.total.toFixed(2)}</span>
+        </div>
+
+        <div style="text-align:center;border-top:1px dashed #d1d5db;padding-top:14px;">
+          <div style="font-weight:700;color:#111827;font-size:13px;">Thank You! Visit Again!</div>
+        </div>
+      `;
+
+      document.body.appendChild(wrapper);
+
+      // Wait for logo image to load (if any)
+      const img = wrapper.querySelector("img");
+      if (img && !img.complete) {
+        await new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          setTimeout(resolve, 2000); // safety timeout
+        });
+      }
+
+      // Capture with html2canvas — isolated HTML has no oklch
+      const canvas = await html2canvas(wrapper, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        allowTaint: true,
+        width: wrapper.offsetWidth,
+        height: wrapper.scrollHeight,
+        windowWidth: wrapper.offsetWidth,
+      });
+
+      document.body.removeChild(wrapper);
+
+      // Build PDF — JPEG at 80% quality keeps file small (~100-200KB)
+      const imgData = canvas.toDataURL("image/jpeg", 0.80);
+      const pdfWidthMm = 148; // A5 width
+      const pdfHeightMm = (canvas.height * pdfWidthMm) / canvas.width;
+
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [pdfWidthMm, pdfHeightMm] });
+      doc.addImage(imgData, "JPEG", 0, 0, pdfWidthMm, pdfHeightMm);
+
+      const pdfBlob = doc.output("blob");
+      const fileName = `Bill-${order.billNumber || order.id.slice(0, 8)}.pdf`;
+      const file = new File([pdfBlob], fileName, { type: "application/pdf" });
+
+      let shared = false;
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: `Bill - ${shop.name}`,
+            text: `Please find attached your bill from ${shop.name}.`
+          });
+          shared = true;
+        } catch (shareError) {
+          console.warn("Navigator share failed, falling back to download", shareError);
+        }
+      }
+
+      if (!shared) {
+        const downloadUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+
+        const phone = order.customerPhone;
+        const url = phone
+          ? `https://wa.me/91${phone}?text=${encodeURIComponent(whatsappText + "\n\n(PDF bill downloaded, please attach it to send)")}`
+          : `https://wa.me/?text=${encodeURIComponent(whatsappText + "\n\n(PDF bill downloaded, please attach it to send)")}`;
+        window.open(url, "_blank");
+      }
+    } catch (error: any) {
+      console.error("Error generating/sharing PDF:", error);
+      alert(`Failed to generate PDF: ${error.message || error}. Opening WhatsApp instead.`);
+      const phone = order.customerPhone;
+      const url = phone
+        ? `https://wa.me/91${phone}?text=${encodeURIComponent(whatsappText)}`
+        : `https://wa.me/?text=${encodeURIComponent(whatsappText)}`;
+      window.open(url, "_blank");
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-y-auto bg-gray-100">
       {/* Action bar */}
@@ -678,13 +892,7 @@ function ReceiptView({ order, shop, logoSrc, onBack, onNewBill }: {
           🖨️ Print
         </button>
         <button
-          onClick={() => {
-            const phone = order.customerPhone;
-            const url = phone
-              ? `https://wa.me/91${phone}?text=${encodeURIComponent(whatsappText)}`
-              : `https://wa.me/?text=${encodeURIComponent(whatsappText)}`;
-            window.open(url, "_blank");
-          }}
+          onClick={shareReceiptPdf}
           className="flex items-center gap-1.5 px-4 py-2 bg-[#25D366] text-white rounded-lg font-bold hover:bg-[#1ebe5d] active:scale-95 transition-all text-sm"
         >
           📱 WhatsApp
