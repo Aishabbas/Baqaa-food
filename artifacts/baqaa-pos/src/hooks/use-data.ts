@@ -21,8 +21,47 @@ export function useShopInfo() {
   };
 }
 
+const CATEGORY_ORDER_KEYS = [
+  "starter",
+  "burger",
+  "fries",
+  "wrap",
+  "sizzler",
+  "mocktail",
+  "beverage",
+  "veg pizza",
+  "non-veg pizza",
+  "non veg pizza",
+  "veg club",
+  "veg sandwich",
+  "non-veg club",
+  "non veg club",
+  "non-veg sandwich",
+  "non veg sandwich",
+  "combo",
+  "add-on",
+  "add on",
+  "cold drink"
+];
+
+function sortCategories<T extends { name: string }>(categories: T[]): T[] {
+  if (!categories) return [];
+  return [...categories].sort((a, b) => {
+    const nameA = a.name.toLowerCase().trim();
+    const nameB = b.name.toLowerCase().trim();
+
+    const getIndex = (name: string) => {
+      const idx = CATEGORY_ORDER_KEYS.findIndex(key => name.includes(key));
+      return idx === -1 ? 999 : idx;
+    };
+
+    return getIndex(nameA) - getIndex(nameB);
+  });
+}
+
 export function useCategories() {
-  const categories = useStorageData(StorageAPI.getCategories);
+  const rawCategories = useStorageData(StorageAPI.getCategories);
+  const categories = sortCategories(rawCategories);
   const addCategory = useCallback((name: string) => {
     const cats = StorageAPI.getCategories();
     cats.push({ id: crypto.randomUUID(), name, createdAt: new Date().toISOString() });
