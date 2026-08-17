@@ -24,6 +24,8 @@ export function useShopInfo() {
 export const CATEGORY_ORDER_KEYS = [
   "starter",
   "burger",
+  "frie",
+  "fry",
   "fries",
   "wrap",
   "sizzler",
@@ -32,16 +34,21 @@ export const CATEGORY_ORDER_KEYS = [
   "veg pizza",
   "non-veg pizza",
   "non veg pizza",
+  "pizza",
   "veg club",
   "veg sandwich",
   "non-veg club",
   "non veg club",
   "non-veg sandwich",
   "non veg sandwich",
+  "sandwich",
+  "club",
   "combo",
   "add-on",
   "add on",
-  "cold drink"
+  "addon",
+  "cold drink",
+  "drink"
 ];
 
 export function sortCategories<T extends { name: string }>(categories: T[]): T[] {
