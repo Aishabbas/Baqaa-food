@@ -21,7 +21,7 @@ export function useShopInfo() {
   };
 }
 
-const CATEGORY_ORDER_KEYS = [
+export const CATEGORY_ORDER_KEYS = [
   "starter",
   "burger",
   "fries",
@@ -44,7 +44,7 @@ const CATEGORY_ORDER_KEYS = [
   "cold drink"
 ];
 
-function sortCategories<T extends { name: string }>(categories: T[]): T[] {
+export function sortCategories<T extends { name: string }>(categories: T[]): T[] {
   if (!categories) return [];
   return [...categories].sort((a, b) => {
     const nameA = a.name.toLowerCase().trim();
