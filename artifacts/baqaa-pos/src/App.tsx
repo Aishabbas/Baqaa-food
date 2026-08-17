@@ -55,6 +55,8 @@ function App() {
 
   useEffect(() => {
     initializeStorage();
+    // Pull latest data from Supabase into localStorage on every app load
+    StorageAPI.fetchCloudData().catch(console.warn);
     
     // ── Secure Device Check ──────────────────────────────────────────────────
     const verifyDevice = () => {

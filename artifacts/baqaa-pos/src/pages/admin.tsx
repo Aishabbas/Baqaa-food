@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useShopInfo, useCategories, useMenuItems, useSecuritySettings } from "@/hooks/use-data";
 import { StorageAPI } from "@/lib/storage";
-import { Plus, Trash2, Edit2, Check, X, Store, Tag, Pizza, Upload, Image, Shield, Key, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, Edit2, Check, X, Store, Tag, Pizza, Upload, Image, Shield, Key, Eye, EyeOff, Cloud, CloudUpload, AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 export default function Admin() {
@@ -60,6 +60,8 @@ function ShopInfoTab() {
   const { data: shop, update } = useShopInfo();
   const [form, setForm] = useState(shop);
   const [saved, setSaved] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ orders: number; customers: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = (e: React.FormEvent) => {
@@ -141,6 +143,62 @@ function ShopInfoTab() {
       >
         {saved ? <><Check className="w-4 h-4 text-green-400" /> Saved!</> : "Save Settings"}
       </button>
+
+      {/* Cloud Sync */}
+      <div className="mt-8 pt-8 border-t border-blue-100">
+        <h3 className="text-blue-700 font-black text-lg mb-1 flex items-center gap-2">
+          <Cloud className="w-5 h-5" /> Sync Local Data to Cloud
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Upload all orders and customers stored on <strong>this device</strong> to Supabase.
+          Safe to run multiple times — existing records will not be duplicated.
+        </p>
+
+        {syncResult && (
+          <div className={`mb-4 p-4 rounded-xl text-sm font-medium ${
+            syncResult.errors.length === 0
+              ? 'bg-green-50 border border-green-200 text-green-800'
+              : 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+          }`}>
+            {syncResult.errors.length === 0 ? (
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-600 shrink-0" />
+                <span>Done! Synced <strong>{syncResult.orders}</strong> orders and <strong>{syncResult.customers}</strong> customers to cloud.</span>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 font-bold">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  Synced {syncResult.orders} orders, {syncResult.customers} customers — but {syncResult.errors.length} error(s) occurred:
+                </div>
+                {syncResult.errors.map((e, i) => <p key={i} className="text-xs pl-6">{e}</p>)}
+              </div>
+            )}
+          </div>
+        )}
+
+        <button
+          type="button"
+          disabled={syncing}
+          onClick={async () => {
+            setSyncResult(null);
+            setSyncing(true);
+            try {
+              const result = await StorageAPI.syncLocalToCloud();
+              setSyncResult(result);
+            } catch (e: any) {
+              setSyncResult({ orders: 0, customers: 0, errors: [e.message || 'Unknown error'] });
+            } finally {
+              setSyncing(false);
+            }
+          }}
+          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 active:scale-95 transition-all shadow-sm text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {syncing
+            ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Syncing...</>
+            : <><CloudUpload className="w-4 h-4" /> Sync This Device's Data to Cloud</>}
+        </button>
+      </div>
 
       {/* Danger Zone */}
       <div className="mt-12 pt-8 border-t border-red-100">

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-// Supabase has been removed for local-only development.
+import { supabase } from './supabase';
 
 const DATA_VERSION = "1.0.0";
 const KEYS = {
@@ -186,6 +186,22 @@ export const StorageAPI = {
     set(KEYS.ORDERS, orders);
     localStorage.setItem(KEYS.BILL_COUNTER, (currentBill + 1).toString());
 
+    // Cloud Sync
+    supabase.from('orders').upsert({
+      id: newOrder.id,
+      bill_number: newOrder.billNumber,
+      items: newOrder.items,
+      subtotal: newOrder.subtotal,
+      discount_type: newOrder.discountType,
+      discount_value: newOrder.discountValue,
+      discount_amount: newOrder.discountAmount,
+      total: newOrder.total,
+      payment_method: newOrder.paymentMethod,
+      customer_name: newOrder.customerName,
+      customer_phone: newOrder.customerPhone,
+      created_at: newOrder.createdAt
+    }).then();
+
     // Update customer
     if (newOrder.customerName) {
       const customers = StorageAPI.getCustomers();
@@ -228,6 +244,22 @@ export const StorageAPI = {
     orders[index] = updatedOrder;
     set(KEYS.ORDERS, orders);
 
+    // Cloud Sync
+    supabase.from('orders').upsert({
+      id: updatedOrder.id,
+      bill_number: updatedOrder.billNumber,
+      items: updatedOrder.items,
+      subtotal: updatedOrder.subtotal,
+      discount_type: updatedOrder.discountType,
+      discount_value: updatedOrder.discountValue,
+      discount_amount: updatedOrder.discountAmount,
+      total: updatedOrder.total,
+      payment_method: updatedOrder.paymentMethod,
+      customer_name: updatedOrder.customerName,
+      customer_phone: updatedOrder.customerPhone,
+      created_at: updatedOrder.createdAt
+    }).then();
+
     return updatedOrder;
   },
 
@@ -235,15 +267,93 @@ export const StorageAPI = {
     const orders = StorageAPI.getOrders();
     const filtered = orders.filter(o => o.id !== id);
     set(KEYS.ORDERS, filtered);
+    // Cloud sync delete
+    await supabase.from('orders').delete().eq('id', id);
   },
 
   getCustomers: () => get<Customer[]>(KEYS.CUSTOMERS, []),
 
-  // Fetch all data from cloud - disabled for local-only
-  fetchCloudData: async () => {},
+  // Fetch all data from cloud (call on app start for new devices)
+  fetchCloudData: async () => {
+    const { data: orders } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+    const { data: cats } = await supabase.from('categories').select('*');
+    const { data: items } = await supabase.from('menu_items').select('*');
+    const { data: customers } = await supabase.from('customers').select('*');
 
-  // Sync offline orders - disabled for local-only
-  syncOfflineOrders: async () => {},
+    if (orders) localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders.map(o => ({
+      ...o,
+      billNumber: o.bill_number,
+      discountType: o.discount_type,
+      discountValue: o.discount_value,
+      discountAmount: o.discount_amount,
+      paymentMethod: o.payment_method,
+      customerName: o.customer_name,
+      customerPhone: o.customer_phone,
+      createdAt: o.created_at
+    }))));
+
+    if (cats) localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(cats.map(c => ({
+      id: c.id, name: c.name, createdAt: c.created_at
+    }))));
+
+    if (items) localStorage.setItem(KEYS.MENU_ITEMS, JSON.stringify(items.map(i => ({
+      id: i.id, name: i.name, price: i.price,
+      categoryId: i.category_id, image: i.image, createdAt: i.created_at
+    }))));
+
+    if (customers) localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(customers.map(c => ({
+      id: c.id, name: c.name, phone: c.phone,
+      createdAt: c.created_at, lastOrderDate: c.last_order_date
+    }))));
+
+    emitChange();
+  },
+
+  // One-time migration: push all localStorage orders & customers up to Supabase
+  syncLocalToCloud: async (): Promise<{ orders: number; customers: number; errors: string[] }> => {
+    const orders = StorageAPI.getOrders();
+    const customers = StorageAPI.getCustomers();
+    const errors: string[] = [];
+    let syncedOrders = 0;
+    let syncedCustomers = 0;
+
+    // Upsert orders in batches of 50
+    for (let i = 0; i < orders.length; i += 50) {
+      const batch = orders.slice(i, i + 50).map(o => ({
+        id: o.id,
+        bill_number: o.billNumber,
+        items: o.items,
+        subtotal: o.subtotal,
+        discount_type: o.discountType,
+        discount_value: o.discountValue,
+        discount_amount: o.discountAmount,
+        total: o.total,
+        payment_method: o.paymentMethod,
+        customer_name: o.customerName,
+        customer_phone: o.customerPhone,
+        created_at: o.createdAt
+      }));
+      const { error } = await supabase.from('orders').upsert(batch);
+      if (error) errors.push(`Orders batch ${i}: ${error.message}`);
+      else syncedOrders += batch.length;
+    }
+
+    // Upsert customers
+    for (let i = 0; i < customers.length; i += 50) {
+      const batch = customers.slice(i, i + 50).map(c => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        created_at: c.createdAt,
+        last_order_date: c.lastOrderDate
+      }));
+      const { error } = await supabase.from('customers').upsert(batch);
+      if (error) errors.push(`Customers batch ${i}: ${error.message}`);
+      else syncedCustomers += batch.length;
+    }
+
+    return { orders: syncedOrders, customers: syncedCustomers, errors };
+  },
   
   resetData: () => {
     localStorage.setItem(KEYS.ORDERS, "[]");
@@ -253,6 +363,8 @@ export const StorageAPI = {
   },
 
   resetCloudData: async () => {
+    await supabase.from('orders').delete().neq('id', 'none');
+    await supabase.from('customers').delete().neq('id', 'none');
     StorageAPI.resetData();
   },
 

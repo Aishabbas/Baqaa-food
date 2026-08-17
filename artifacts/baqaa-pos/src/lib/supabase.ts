@@ -1,28 +1,10 @@
-// Supabase has been disabled to run 100% locally.
-export const supabase = {
-  from: () => {
-    const chain: any = {
-      select: () => chain,
-      upsert: () => chain,
-      delete: () => chain,
-      eq: () => chain,
-      neq: () => chain,
-      order: () => chain,
-      single: () => chain,
-      then: (resolve: any) => {
-        // Resolve with empty array/null data to prevent app crashes
-        resolve({ data: [], error: null });
-      }
-    };
-    return chain;
-  },
-  channel: () => {
-    const channelChain: any = {
-      on: () => channelChain,
-      subscribe: () => {}
-    };
-    return channelChain;
-  },
-  removeChannel: () => {}
-} as any;
+import { createClient } from '@supabase/supabase-js';
 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase credentials missing. Cloud sync will be disabled.');
+}
+
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
