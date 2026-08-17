@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useShopInfo, useCategories, useMenuItems, useSecuritySettings, CATEGORY_ORDER_KEYS } from "@/hooks/use-data";
+import { useShopInfo, useCategories, useMenuItems, useSecuritySettings, getCategoryRank } from "@/hooks/use-data";
 import { StorageAPI } from "@/lib/storage";
 import { Plus, Trash2, Edit2, Check, X, Store, Tag, Pizza, Upload, Image, Shield, Key, Eye, EyeOff, Cloud, CloudUpload, AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
@@ -288,9 +288,7 @@ function MenuItemsTab() {
   const getCatIndex = (catId: string) => {
     const cat = categories.find((c: any) => c.id === catId);
     if (!cat) return 999;
-    const name = cat.name.toLowerCase().trim();
-    const idx = CATEGORY_ORDER_KEYS.findIndex(key => name.includes(key));
-    return idx === -1 ? 999 : idx;
+    return getCategoryRank(cat.name);
   };
 
   const displayItems = items

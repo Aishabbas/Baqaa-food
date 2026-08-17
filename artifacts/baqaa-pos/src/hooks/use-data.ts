@@ -21,49 +21,35 @@ export function useShopInfo() {
   };
 }
 
-export const CATEGORY_ORDER_KEYS = [
-  "starter",
-  "burger",
-  "frie",
-  "fry",
-  "fries",
-  "wrap",
-  "sizzler",
-  "mocktail",
-  "beverage",
-  "veg pizza",
-  "non-veg pizza",
-  "non veg pizza",
-  "pizza",
-  "veg club",
-  "veg sandwich",
-  "non-veg club",
-  "non veg club",
-  "non-veg sandwich",
-  "non veg sandwich",
-  "sandwich",
-  "club",
-  "combo",
-  "add-on",
-  "add on",
-  "addon",
-  "cold drink",
-  "drink"
-];
+export function getCategoryRank(rawName: string): number {
+  const name = rawName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  if (name.includes('starter')) return 1;
+  if (name.includes('burger')) return 2;
+  if (name.includes('frie') || name.includes('fry')) return 3;
+  if (name.includes('wrap')) return 4;
+  if (name.includes('sizzler')) return 5;
+  if (name.includes('beverage') || name.includes('mocktail')) return 6;
+
+  // Check Non-Veg before Veg!
+  if (name.includes('nonveg') && name.includes('pizza')) return 8;
+  if (name.includes('vegpizza') || (name.includes('veg') && name.includes('pizza'))) return 7;
+  if (name.includes('pizza')) return 8;
+
+  if (name.includes('nonveg') && (name.includes('sandwich') || name.includes('club'))) return 10;
+  if (name.includes('vegsandwich') || name.includes('vegclub') || (name.includes('veg') && (name.includes('sandwich') || name.includes('club')))) return 9;
+  if (name.includes('sandwich') || name.includes('club')) return 10;
+
+  if (name.includes('combo')) return 11;
+  if (name.includes('addon') || name.includes('add')) return 12;
+  if (name.includes('colddrink') || name.includes('drink')) return 13;
+
+  return 999;
+}
 
 export function sortCategories<T extends { name: string }>(categories: T[]): T[] {
   if (!categories) return [];
-  return [...categories].sort((a, b) => {
-    const nameA = a.name.toLowerCase().trim();
-    const nameB = b.name.toLowerCase().trim();
-
-    const getIndex = (name: string) => {
-      const idx = CATEGORY_ORDER_KEYS.findIndex(key => name.includes(key));
-      return idx === -1 ? 999 : idx;
-    };
-
-    return getIndex(nameA) - getIndex(nameB);
-  });
+  return [...categories].sort((a, b) => getCategoryRank(a.name) - getCategoryRank(b.name));
 }
 
 export function useCategories() {

@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { ShoppingCart, Plus, Minus, Trash2, ChevronDown, User, Phone, X, ArrowLeft, PlusCircle, Search } from "lucide-react";
-import { useCategories, useMenuItems, useOrders, useCustomers, useShopInfo, CATEGORY_ORDER_KEYS } from "@/hooks/use-data";
+import { useCategories, useMenuItems, useOrders, useCustomers, useShopInfo, getCategoryRank } from "@/hooks/use-data";
 import { formatCurrency, getEmojiSvgUri, cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -179,9 +179,7 @@ export default function POS() {
     const getCatIndex = (catId: string) => {
       const cat = categories.find((c: any) => c.id === catId);
       if (!cat) return 999;
-      const name = cat.name.toLowerCase().trim();
-      const idx = CATEGORY_ORDER_KEYS.findIndex(key => name.includes(key));
-      return idx === -1 ? 999 : idx;
+      return getCategoryRank(cat.name);
     };
 
     return items.sort((a, b) => {
