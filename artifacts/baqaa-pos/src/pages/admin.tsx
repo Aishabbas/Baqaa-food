@@ -285,7 +285,9 @@ function MenuItemsTab() {
     setIsEditing(null);
   };
 
-  const displayItems = filterCat === "All" ? items : items.filter((i) => i.categoryId === filterCat);
+  const displayItems = items
+    ? [...(filterCat === "All" ? items : items.filter((i) => i.categoryId === filterCat))].sort((a, b) => a.price - b.price)
+    : [];
 
   if (isEditing) {
     return (

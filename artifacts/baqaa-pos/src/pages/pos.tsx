@@ -167,7 +167,7 @@ export default function POS() {
   const total = subtotal - discountAmount;
 
   const filteredItems = useMemo(() => {
-    let items = menuItems;
+    let items = menuItems ? [...menuItems] : [];
     if (activeTab.activeCategory !== "All") {
       items = items.filter((i) => i.categoryId === activeTab.activeCategory);
     }
@@ -175,7 +175,7 @@ export default function POS() {
       const q = searchQuery.toLowerCase().trim();
       items = items.filter((i) => i.name.toLowerCase().includes(q));
     }
-    return items;
+    return items.sort((a, b) => a.price - b.price);
   }, [menuItems, activeTab.activeCategory, searchQuery]);
 
 
